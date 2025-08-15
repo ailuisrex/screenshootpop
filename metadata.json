@@ -1,0 +1,5 @@
+{
+  "name": "Heroic Popcorn Saga",
+  "description": "An application that generates a cinematic scene from a conceptual 2.5D side-scroller game, featuring a heroic popcorn box battling a ceramic monster using the Gemini API.",
+  "requestFramePermissions": []
+}
