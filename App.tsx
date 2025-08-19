@@ -1,6 +1,9 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { generateGameSceneImage } from './services/geminiService';
+
+const STORAGE_KEY = 'heroic-popcorn-saga-gallery';
+const MAX_GALLERY_ITEMS = 6;
 
 const Header: React.FC = () => (
   <header className="text-center p-4 md:p-6">
@@ -38,13 +41,52 @@ const ImageDisplay: React.FC<ImageDisplayProps> = ({ imageUrl, isLoading }) => (
         {imageUrl && (
             <img 
                 src={imageUrl} 
-                alt="Generated game scene of a heroic popcorn box" 
+                alt="Generated game scene of a heroic character" 
                 className="object-cover w-full h-full transition-opacity duration-700 ease-in-out opacity-0"
                 onLoad={(e) => (e.currentTarget.style.opacity = '1')}
             />
         )}
     </div>
 );
+
+const characterOptions = [
+    { id: 'popcorn', name: 'Popcorn Box', emoji: '🍿' },
+    { id: 'soda', name: 'Soda Can', emoji: '🥤' },
+    { id: 'pizza', name: 'Pizza Slice', emoji: '🍕' },
+    { id: 'hotdog', name: 'Hot Dog', emoji: '🌭' },
+];
+
+interface CharacterSelectorProps {
+    selectedCharacter: string;
+    onCharacterChange: (id: string) => void;
+}
+
+const CharacterSelector: React.FC<CharacterSelectorProps> = ({ selectedCharacter, onCharacterChange }) => (
+    <div className="mt-8 w-full max-w-lg">
+        <h3 className="text-lg font-semibold text-center text-gray-300 mb-4">Choose Your Hero</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {characterOptions.map((char) => (
+                <button
+                    key={char.id}
+                    onClick={() => onCharacterChange(char.id)}
+                    className={`
+                        p-4 rounded-lg flex flex-col items-center justify-center transition-all duration-200
+                        border-2 
+                        ${selectedCharacter === char.id 
+                            ? 'bg-yellow-500/20 border-yellow-400 scale-105 shadow-lg' 
+                            : 'bg-gray-700/50 border-gray-600 hover:bg-gray-600/50 hover:border-gray-500'
+                        }
+                    `}
+                    aria-pressed={selectedCharacter === char.id}
+                >
+                    <span className="text-4xl">{char.emoji}</span>
+                    <span className="mt-2 font-semibold text-sm text-white">{char.name}</span>
+                </button>
+            ))}
+        </div>
+    </div>
+);
+
 
 const GenerateButton: React.FC<{ onClick: () => void; disabled: boolean }> = ({ onClick, disabled }) => (
     <button
@@ -65,20 +107,88 @@ const GenerateButton: React.FC<{ onClick: () => void; disabled: boolean }> = ({ 
     </button>
 );
 
+interface ImageGalleryProps {
+    images: string[];
+    selectedImage: string | null;
+    onSelectImage: (url: string) => void;
+    onClearGallery: () => void;
+}
+
+const ImageGallery: React.FC<ImageGalleryProps> = ({ images, selectedImage, onSelectImage, onClearGallery }) => (
+    <section className="w-full max-w-5xl mt-12 animate-fade-in">
+        <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-300">Recently Generated</h2>
+            <button
+                onClick={onClearGallery}
+                className="flex items-center text-sm text-gray-400 hover:text-white transition-colors duration-200 p-2 rounded-md hover:bg-gray-700/50"
+                aria-label="Clear gallery"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear
+            </button>
+        </div>
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+            {images.map((imgSrc, index) => (
+                <button
+                    key={index}
+                    onClick={() => onSelectImage(imgSrc)}
+                    className={`
+                        relative aspect-square rounded-lg overflow-hidden focus:outline-none transition-all duration-200
+                        ${selectedImage === imgSrc ? 'ring-4 ring-yellow-400 ring-offset-2 ring-offset-gray-900' : 'ring-2 ring-transparent hover:ring-gray-500'}
+                    `}
+                    aria-label={`Select generated image ${index + 1}`}
+                >
+                    <img
+                        src={imgSrc}
+                        alt={`Generated scene thumbnail ${index + 1}`}
+                        className="w-full h-full object-cover"
+                    />
+                </button>
+            ))}
+        </div>
+    </section>
+);
+
 
 export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [gallery, setGallery] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [character, setCharacter] = useState<string>('popcorn');
+
+  useEffect(() => {
+    try {
+      const storedGallery = localStorage.getItem(STORAGE_KEY);
+      if (storedGallery) {
+        const parsedGallery = JSON.parse(storedGallery);
+        if (Array.isArray(parsedGallery) && parsedGallery.length > 0) {
+          setGallery(parsedGallery);
+          setImageUrl(parsedGallery[0]); // Display the most recent image on load
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load gallery from local storage:", e);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
 
   const handleGenerateClick = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    setImageUrl(null); // Clear previous image for better loading feel
-
+    
     try {
-      const generatedUrl = await generateGameSceneImage();
+      const generatedUrl = await generateGameSceneImage(character);
       setImageUrl(generatedUrl);
+      
+      setGallery(prevGallery => {
+        const newGallery = [generatedUrl, ...prevGallery].filter((v, i, a) => a.indexOf(v) === i).slice(0, MAX_GALLERY_ITEMS);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newGallery));
+        return newGallery;
+      });
+
     } catch (err) {
       if (err instanceof Error) {
         setError(`An error occurred: ${err.message}`);
@@ -88,7 +198,17 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [character]);
+
+  const handleSelectImage = (url: string) => {
+    setImageUrl(url);
+  };
+
+  const handleClearGallery = () => {
+    setGallery([]);
+    setImageUrl(null);
+    localStorage.removeItem(STORAGE_KEY);
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans flex flex-col items-center justify-center p-4">
@@ -104,7 +224,18 @@ export default function App() {
               </div>
             )}
             
+            <CharacterSelector selectedCharacter={character} onCharacterChange={setCharacter} />
+
             <GenerateButton onClick={handleGenerateClick} disabled={isLoading} />
+
+            {gallery.length > 0 && (
+                <ImageGallery 
+                    images={gallery} 
+                    selectedImage={imageUrl}
+                    onSelectImage={handleSelectImage}
+                    onClearGallery={handleClearGallery}
+                />
+            )}
         </main>
         <footer className="text-center text-gray-500 text-sm p-4 mt-auto">
             <p>Powered by Google Gemini API. Concept Art Generator.</p>

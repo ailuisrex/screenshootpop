@@ -7,10 +7,25 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const GAME_SCENE_PROMPT = `
+const getCharacterDescription = (characterId: string): string => {
+    switch (characterId) {
+        case 'soda':
+            return 'a brave soda can';
+        case 'pizza':
+            return 'a valiant pizza slice';
+        case 'hotdog':
+            return 'a courageous hot dog';
+        case 'popcorn':
+        default:
+            return 'a heroic popcorn box';
+    }
+};
+
+
+const createGameScenePrompt = (characterDescription: string) => `
 A dynamic, high-action scene from a 2.5D side-scroller game.
-The main character, a heroic popcorn box, is captured mid-jump, transforming into its superhero version.
-The popcorn box is crafted from ornate white porcelain, adorned with intricate red striped patterns and delicate golden filigree accents. Its surface is highly detailed and reflective.
+The main character, ${characterDescription}, is captured mid-jump, transforming into its superhero version.
+The character is crafted from ornate white porcelain, adorned with intricate red striped patterns and delicate golden filigree accents. Its surface is highly detailed and reflective.
 A vibrant, elegant blue cape, made of shimmering silk, flows majestically behind it as it leaps.
 Below the hero, a stylized, monstrous villain made of glossy, dark green ceramic with large, expressive white eyes attempts to intercept it from a simple platform.
 The background is a vibrant, slightly out-of-focus game level under a dramatic, dark sky.
@@ -18,11 +33,14 @@ The entire scene is illuminated with dramatic cinematic lighting, casting soft s
 Elegant and regal design, cinematic lighting, ultra-realistic 8k concept art.
 `;
 
-export const generateGameSceneImage = async (): Promise<string> => {
+export const generateGameSceneImage = async (characterId: string): Promise<string> => {
     try {
+        const characterDescription = getCharacterDescription(characterId);
+        const prompt = createGameScenePrompt(characterDescription);
+
         const response = await ai.models.generateImages({
             model: 'imagen-3.0-generate-002',
-            prompt: GAME_SCENE_PROMPT,
+            prompt: prompt,
             config: {
                 numberOfImages: 1,
                 outputMimeType: 'image/jpeg',
